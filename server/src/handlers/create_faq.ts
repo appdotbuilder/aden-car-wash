@@ -1,12 +1,12 @@
+import { db } from '../db';
+import { faqsTable } from '../db/schema';
 import { type CreateFaqInput, type FAQ } from '../schema';
 
-export async function createFaq(input: CreateFaqInput): Promise<FAQ> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is creating a new FAQ entry
-    // with support for tags and ordering.
-    
-    return Promise.resolve({
-        id: 0,
+export const createFaq = async (input: CreateFaqInput): Promise<FAQ> => {
+  try {
+    // Insert FAQ record
+    const result = await db.insert(faqsTable)
+      .values({
         q_ar: input.q_ar,
         q_en: input.q_en,
         a_ar: input.a_ar,
@@ -14,5 +14,14 @@ export async function createFaq(input: CreateFaqInput): Promise<FAQ> {
         order: input.order,
         tags: input.tags,
         visible: input.visible
-    });
-}
+      })
+      .returning()
+      .execute();
+
+    const faq = result[0];
+    return faq;
+  } catch (error) {
+    console.error('FAQ creation failed:', error);
+    throw error;
+  }
+};

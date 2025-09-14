@@ -1,31 +1,68 @@
+import { db } from '../db';
+import { customersTable } from '../db/schema';
 import { type CreateCustomerInput, type Customer } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function createCustomer(input: CreateCustomerInput): Promise<Customer> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is creating a new customer record
-    // with phone number validation and WhatsApp verification.
-    
-    return Promise.resolve({
-        id: 0,
+export const createCustomer = async (input: CreateCustomerInput): Promise<Customer> => {
+  try {
+    // Check if customer already exists with this phone number
+    const existingCustomer = await findCustomerByPhone(input.phone);
+    if (existingCustomer) {
+      // Return existing customer instead of creating duplicate
+      return existingCustomer;
+    }
+
+    // Insert new customer record
+    const result = await db.insert(customersTable)
+      .values({
         name: input.name,
         phone: input.phone,
-        whatsapp_verified: input.whatsapp_verified,
-        created_at: new Date()
-    });
-}
+        whatsapp_verified: input.whatsapp_verified // Uses default false if not provided
+      })
+      .returning()
+      .execute();
 
-export async function findCustomerByPhone(phone: string): Promise<Customer | null> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is finding existing customer by phone number
-    // to avoid duplicates during booking creation.
-    
-    return null;
-}
+    const customer = result[0];
+    return {
+      ...customer
+    };
+  } catch (error) {
+    console.error('Customer creation failed:', error);
+    throw error;
+  }
+};
 
-export async function verifyCustomerWhatsApp(phone: string): Promise<boolean> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is sending WhatsApp OTP for verification
-    // and updating customer verification status.
-    
-    return Promise.resolve(true);
-}
+export const findCustomerByPhone = async (phone: string): Promise<Customer | null> => {
+  try {
+    const customers = await db.select()
+      .from(customersTable)
+      .where(eq(customersTable.phone, phone))
+      .execute();
+
+    return customers.length > 0 ? customers[0] : null;
+  } catch (error) {
+    console.error('Customer lookup failed:', error);
+    throw error;
+  }
+};
+
+export const verifyCustomerWhatsApp = async (phone: string): Promise<boolean> => {
+  try {
+    // Find customer by phone number
+    const customer = await findCustomerByPhone(phone);
+    if (!customer) {
+      throw new Error('Customer not found');
+    }
+
+    // Update customer's WhatsApp verification status
+    await db.update(customersTable)
+      .set({ whatsapp_verified: true })
+      .where(eq(customersTable.id, customer.id))
+      .execute();
+
+    return true;
+  } catch (error) {
+    console.error('WhatsApp verification failed:', error);
+    throw error;
+  }
+};
